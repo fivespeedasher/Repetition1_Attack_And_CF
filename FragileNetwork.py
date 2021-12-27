@@ -67,7 +67,7 @@ class FragileNetwork(object):
 
     def HD_attack(self,m) -> int:
         """
-        Attack m nodes which have the highest degree, return CFattack
+        Attack m nodes which have the highest degree. Resetting L when attack next node. Return normalized CF
         m:  int
         Return->CFattack:   int
         """
@@ -76,38 +76,43 @@ class FragileNetwork(object):
 
         ## Processing degree 0
         self.L = np.where(self.L==0, self.L-1, self.L)
-        Ltemp = self.L
+        Ltemp = np.copy(self.L)
+        assert(id(Ltemp)!=id(self.L))
 
         assert(self.n == self.k.size)
         CF = np.zeros((self.n,1))
         # start to attack nodes in top_m_k
         for i in top_m_k:
             node = i
+            count = 0
             while self.L[i] > 0:
-
                 # delta_L regard each node broken can distribute load to others
                 sum_Li = np.abs(self.A @ self.L) # for avoiding a negative Li become a positive one 
+                assert(sum_Li != 0)
                 delta_L = (((self.L / sum_Li) @ self.L.T) * self.A)
-                delta_L = np.nan_to_num(delta_L)
+                # delta_L = np.nan_to_num(delta_L)
                 # self.A[i,:] = 0
                 # self.A[:,i] = 0
                 self.L[i] = -1 # for avoiding nan from division
                 self.L = self.L+(delta_L[i,:].reshape(self.k.size,1))
                 assert(self.L.size == self.k.size)
 
-                new_broken = np.argwhere(self.L>self.C)[:,0]
-                if new_broken.size ==0: break
+                new_break = np.argwhere(self.L>self.C)[:,0]
+                if new_break.size ==0: break
                 else:
-                    i = new_broken[0]
-                    new_broken = new_broken[1:]
-            CF[node] = np.argwhere(self.L[:,0] < 0).size-1
-            self.L = Ltemp
+                    i = new_break[0]
+                    count += 1
+                    new_break = new_break[1:]
+            CF[node] = count
+            self.L = np.copy(Ltemp)
 
         CF_normalized = np.sum(CF,axis=0) / (m * (self.n-1))
-        print(CF_normalized)
+        return CF_normalized
         
 if __name__ == '__main__':
-    G_BA = nx.barabasi_albert_graph(200,10)
+    # Attack BA network, try 20 times
+    G_BA = nx.barabasi_albert_graph(250,2)
     Adj = nx.to_numpy_array(G_BA)
-    c_network = FragileNetwork(Adj,1.1)
-    attack_ind = c_network.HD_attack(3)
+    c_network = FragileNetwork(Adj,1.005)
+    CF_normalized = c_network.HD_attack(10)
+    print(CF_normalized)
