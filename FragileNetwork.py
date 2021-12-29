@@ -2,6 +2,7 @@
 #TODO 测试其他的网络
 #TODO 加入其他网络、画图、加入LD_attack
 import networkx as nx
+import matplotlib.pyplot as plt
 from networkx.classes.function import degree
 from networkx.convert_matrix import to_numpy_matrix
 from networkx.generators.classic import complete_graph
@@ -87,8 +88,8 @@ class FragileNetwork(object):
             count = 0
             while self.L[i] > 0:
                 # delta_L regard each node broken can distribute load to others
-                sum_Li = np.abs(self.A @ self.L) # for avoiding a negative Li become a positive one 
-                assert(sum_Li != 0)
+                sum_Li = np.abs(self.A @ self.L) # for avoiding a negative Li become a positive one
+                assert(sum_Li.any() != 0) 
                 delta_L = (((self.L / sum_Li) @ self.L.T) * self.A)
                 # delta_L = np.nan_to_num(delta_L)
                 # self.A[i,:] = 0
@@ -108,11 +109,44 @@ class FragileNetwork(object):
 
         CF_normalized = np.sum(CF,axis=0) / (m * (self.n-1))
         return CF_normalized
-        
+
+def average_cf(times,nodes,T):
+    """"
+    times->int : means looping times and then we dividing initial_times to calculate average CF of the same T
+    nodes, T -> int
+    Return: CF_average -> int
+    """
+    init_times = times
+    HD_CF_normalized_sum = 0
+    while times:
+        times -= 1
+        G_BA = nx.barabasi_albert_graph(nodes,2)
+        Adj = nx.to_numpy_array(G_BA)
+        a_network = FragileNetwork(Adj,T)
+        # attack 10 nodes
+        HD_CF_normalized_sum += a_network.HD_attack(10) 
+
+    HD_CF_average = HD_CF_normalized_sum / init_times
+    return HD_CF_average
+
+def visualize(t,HD_BA_CF,HD_WS_CF=[0],LD_BA_CF=[0],LD_WS_CF=[0]):
+    """
+    plot the CF_normalized after HD attack and LD attack
+    Input ->  array
+    Return -> None
+    """
+    fig = plt.figure()
+    fig, (HD_BA) = plt.subplots(1,1, sharex=True)
+    HD_BA.plot(t,HD_BA_CF)
+    plt.show()
+    return 0
+
+
 if __name__ == '__main__':
     # Attack BA network, try 20 times
-    G_BA = nx.barabasi_albert_graph(250,2)
-    Adj = nx.to_numpy_array(G_BA)
-    c_network = FragileNetwork(Adj,1.005)
-    CF_normalized = c_network.HD_attack(10)
-    print(CF_normalized)
+    T = np.arange(1,1.25,0.005)
+    HD_CF = []
+    for t in T:
+        HD_CF.append(average_cf(20,200,t))
+        print("t,HD_CF",t,HD_CF)
+    visualize(T,HD_CF)
